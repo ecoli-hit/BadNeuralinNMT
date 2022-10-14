@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -eu
-ROOT=./
+ROOT=/data/ecoli/bart/PTvsBT/scripts
 REPLACE_UNICODE_PUNCT=$ROOT/mosesdecoder/scripts/tokenizer/replace-unicode-punctuation.perl
 NORM_PUNC=$ROOT/mosesdecoder/scripts/tokenizer/normalize-punctuation.perl
 REM_NON_PRINT_CHAR=$ROOT/mosesdecoder/scripts/tokenizer/remove-non-printing-char.perl

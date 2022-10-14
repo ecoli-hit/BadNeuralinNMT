@@ -3,7 +3,7 @@
 # get mBART and En-Ro training data for WMT16
 # adapt from https://github.com/rsennrich/wmt16-scripts/blob/master/sample/download_files.sh
 
-ROOT=./
+ROOT=/data/ecoli/bart/PTvsBT
 SCRIPTS=$ROOT/scripts
 DEVTEST=$ROOT/devtest
 cd $ROOT
@@ -51,6 +51,7 @@ python3 $SCRIPTS/tospm.py $PATHTOMBART/sentence.bpe.model < $DEVTEST/test.tag.en
 python3 $SCRIPTS/tospm.py $PATHTOMBART/sentence.bpe.model < $DEVTEST/test.ro > test.ro_RO
 
 # build data bin for fairseq
+
 SRCDICT=$PATHTOMBART/dict.txt
 TGTDICT=$PATHTOMBART/dict.txt
 fairseq-preprocess \
@@ -65,9 +66,3 @@ fairseq-preprocess \
   --srcdict ${SRCDICT} \
   --tgtdict ${TGTDICT} \
   --workers 40
-
-
-
-
-
-

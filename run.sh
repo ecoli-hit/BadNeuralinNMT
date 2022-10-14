@@ -7,10 +7,10 @@
 #SBATCH --time 24:00:00
 #SBATCH --partition a100_batch
 
-ROOT=./
+ROOT=/data/ecoli/bart/PTvsBT
 FAIRSEQ=$ROOT/fairseq
 PRETRAIN=$ROOT/mbart.cc25.v2/model.pt
-OUTPUT=$ROOT/mbart-tagbt-32k-checkpoints
+OUTPUT=$ROOT/CTD_test9_withmute_0.1
 
 DATA=$ROOT/tagbt-data-bin
 PRERO=$ROOT/scripts/rotok.sh
@@ -23,21 +23,37 @@ langs=ar_AR,cs_CZ,de_DE,en_XX,es_XX,et_EE,fi_FI,fr_XX,gu_IN,hi_IN,it_IT,ja_XX,kk
 
 mkdir $OUTPUT
 cp $0 $OUTPUT
-git --git-dir=$FAIRSEQ/.git log | head -1 |& tee $OUTPUT/git.log
+git --git-dir=$FAIRSEQ/.git log | head -1 | tee $OUTPUT/git.log
 
-python3 $FAIRSEQ/train.py $DATA \
+# CUDA_VISIBLE_DEVICES=2  python3 -m pdb $FAIRSEQ/train.py $DATA \
+# --encoder-normalize-before --decoder-normalize-before  --share-all-embeddings \
+# --arch mbart_large --task translation_from_pretrained_bart  --source-lang en_XX --target-lang ro_RO \
+# --criterion label_smoothed_cross_entropy --label-smoothing 0.2  \
+# --dataset-impl mmap --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
+# --lr-scheduler polynomial_decay --lr 3e-05 --min-lr -1 \
+# --warmup-updates 2500 --total-num-update 100000 --max-update 100000 \
+# --dropout 0.3 --attention-dropout 0.1 --weight-decay 0.0 \
+# --max-tokens 4096 --update-freq 2 --save-interval 1 --save-interval-updates 5000 --keep-interval-updates 1 --no-epoch-checkpoints \
+# --log-format simple --log-interval 1000 --reset-optimizer --reset-meters --reset-dataloader --reset-lr-scheduler \
+# --restore-file $PRETRAIN --langs $langs --layernorm-embedding  --ddp-backend no_c10d --fp16 \
+# --seed 222 --save-dir $OUTPUT \
+# | tee $OUTPUT/train.log
+
+
+# CHILD_TUNINGD
+CUDA_VISIBLE_DEVICES=0,1,2,3  python3  $FAIRSEQ/train.py $DATA \
 --encoder-normalize-before --decoder-normalize-before  --share-all-embeddings \
 --arch mbart_large --task translation_from_pretrained_bart  --source-lang en_XX --target-lang ro_RO \
 --criterion label_smoothed_cross_entropy --label-smoothing 0.2  \
---dataset-impl mmap --optimizer adam --adam-eps 1e-06 --adam-betas '(0.9, 0.98)' \
+--dataset-impl mmap --optimizer CHILD_TUNINGD  --fp16-no-flatten-grads \
 --lr-scheduler polynomial_decay --lr 3e-05 --min-lr -1 \
 --warmup-updates 2500 --total-num-update 100000 --max-update 100000 \
---dropout 0.3 --attention-dropout 0.1 --weight-decay 0.0 \
+--dropout 0.3 --attention-dropout 0.1  \
 --max-tokens 4096 --update-freq 2 --save-interval 1 --save-interval-updates 5000 --keep-interval-updates 1 --no-epoch-checkpoints \
 --log-format simple --log-interval 1000 --reset-optimizer --reset-meters --reset-dataloader --reset-lr-scheduler \
 --restore-file $PRETRAIN --langs $langs --layernorm-embedding  --ddp-backend no_c10d --fp16 \
 --seed 222 --save-dir $OUTPUT \
-|& tee $OUTPUT/train.log
+| tee $OUTPUT/train.log
 
 RESULT=$OUTPUT/test
 PYTHONIOENCODING=utf-8 python3 $FAIRSEQ/fairseq_cli/generate.py $DATA \
@@ -54,4 +70,4 @@ sacrebleu -t wmt16 -l en-ro --detail < ${RESULT}.hyp > $RESULT.sacre.score
 
 sh $PRERO ${RESULT}.hyp > ${RESULT}.mbart.tok.hyp
 sh $PRERO ${REF} > ${RESULT}.mbart.tok.ref
-sacrebleu -tok 'none' -s 'none' ${RESULT}.mbart.tok.ref < ${RESULT}.mbart.tok.hyp > $RESULT.mbart.tok.score
+sacrebleu --force -tok 'none' -s 'none' ${RESULT}.mbart.tok.ref < ${RESULT}.mbart.tok.hyp > $RESULT.mbart.tok.score
